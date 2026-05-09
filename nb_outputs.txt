@@ -1,0 +1,1113 @@
+--- Cell 2 ---
+SRC: # Set tier early — every downstream cell reads this.
+import os
+os.environ["COMPUTE_TIER"] = "T4"
+pri
+OUT: COMPUTE_TIER set to T4
+
+
+--- Cell 3 ---
+SRC: # Install required packages (~3-5 min on Colab)
+!pip install -q unsloth>=2025.10 trl>=0.12 peft>=0.1
+OUT: [31mERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+
+omegaconf 2.3.0 requires antlr4-python3-runtime==4.9.*, but you have antlr4-python3-runtime 4.11.0 which is incompatible.[0m[31m
+
+[0m
+
+--- Cell 4 ---
+SRC: # Probe GPU
+import torch
+assert torch.cuda.is_available(), "Enable GPU runtime: Runtime → Change run
+OUT: GPU: Tesla T4  (15.6 GB)
+
+
+--- Cell 5 ---
+SRC: # Set up working directory matching the repo layout — Colab runs from /content
+from pathlib import P
+OUT: Working dir: /content/lab22/notebooks
+
+
+--- Cell 10 ---
+SRC: import os
+from pathlib import Path
+
+# Tier detection. Defaults to T4 if env not set.
+COMPUTE_TIER = 
+OUT: COMPUTE_TIER:    T4
+
+BASE_MODEL:      unsloth/Qwen2.5-3B-bnb-4bit
+
+SFT_DATASET:     5CD-AI/Vietnamese-alpaca-gpt4-gg-translated  (slice: 1000)
+
+max_seq_length:  512
+
+effective batch: 8
+
+output:          /content/lab22/adapters/sft-mini
+
+
+--- Cell 11 ---
+SRC: import torch
+
+assert torch.cuda.is_available(), "DPO needs a CUDA GPU. See HARDWARE-GUIDE.md."
+gpu =
+OUT: GPU: Tesla T4  (15.6 GB)
+
+
+--- Cell 13 ---
+SRC: from unsloth import FastLanguageModel
+
+model, tokenizer = FastLanguageModel.from_pretrained(
+    mod
+OUT: 🦥 Unsloth: Will patch your computer to enable 2x faster free finetuning.
+
+🦥 Unsloth Zoo will now patch everything to make training faster!
+
+==((====))==  Unsloth 2026.5.2: Fast Qwen2 patching. Transformers: 5.5.0.
+
+   \\   /|    Tesla T4. Num GPUs = 1. Max memory: 14.563 GB. Platform: Linux.
+
+O^O/ \_/ \    Torch: 2.10.0+cu128. CUDA: 7.5. CUDA Toolkit: 12.8. Triton: 3.6.0
+
+\        /    Bfloat16 = FALSE. FA [Xformers = 0.0.35. FA2 = False]
+
+ "-____-"     Free license: http://github.com/unslothai/unsloth
+
+Unsloth: Fast downloading is enabled - ignore downloading bars which are red colored!
+
+model.safetensors:   0%|          | 0.00/2.05G [00:00<?, ?B/s]
+Loading weights:   0%|          | 0/434 [00:00<?, ?it/s]
+generation_config.json:   0%|          | 0.00/171 [00:00<?, ?B/s]
+config.json: 0.00B [00:00, ?B/s]
+tokenizer_config.json: 0.00B [00:00, ?B/s]
+vocab.json: 0.00B [00:00, ?B/s]
+merges.txt: 0.00B [00:00, ?B/s]
+tokenizer.json:   0%|          | 0.00/11.4M [00:00<?, ?B/s]
+added_tokens.json:   0%|          | 0.00/605 [00:00<?, ?B/s]
+special_tokens_map.json:   0%|          | 0.00/617 [00:00<?, ?B/s]
+unsloth/Qwen2.5-3B-bnb-4bit does not have a padding token! Will use pad_token = <|PAD_TOKEN|>.
+
+
+--- Cell 14 ---
+SRC: model = FastLanguageModel.get_peft_model(
+    model,
+    r=16,
+    lora_alpha=32,
+    lora_dropout=0
+OUT: Unsloth 2026.5.2 patched 36 layers with 36 QKV layers, 36 O layers and 36 MLP layers.
+
+Trainable params: 29,933,568
+
+
+--- Cell 16 ---
+SRC: from datasets import load_dataset
+
+ds = load_dataset(SFT_DATASET, split=f"train[:{SFT_SLICE}]")
+prin
+OUT: README.md:   0%|          | 0.00/95.0 [00:00<?, ?B/s]
+alpaca_gpt4_data_vi.json:   0%|          | 0.00/102M [00:00<?, ?B/s]
+Generating train split:   0%|          | 0/52002 [00:00<?, ? examples/s]
+Loaded 1000 rows. Columns: ['input_en', 'input_vi', 'instruction_vi', 'output_vi', 'output_en', 'instruction_en']
+
+
+
+First row:
+
+{'input_en': '', 'input_vi': '', 'instruction_vi': 'Đưa ra ba lời khuyên để giữ sức khỏe.', 'output_vi': '1. Ăn một chế độ ăn uống cân bằng và bổ dưỡng: Đảm bảo bữa ăn của bạn bao gồm nhiều loại trái cây và rau quả, protein nạc, ngũ cốc nguyên hạt và chất béo lành mạnh. Điều này giúp cung cấp cho cơ thể bạn các chất dinh dưỡng cần thiết để hoạt động tốt nhất và có thể giúp ngăn ngừa các bệnh mãn tính. 2. Tham gia hoạt động thể chất thường xuyên: Tập thể dục rất quan trọng để duy trì xương, cơ bắp và sức khỏe tim mạch chắc khỏe. Đặt mục tiêu tập thể dục nhịp điệu vừa phải ít nhất 150 phút hoặc tập thể dục cường độ cao 75 phút mỗi tuần. 3. Ngủ đủ giấc: Ngủ đủ giấc là điều rất quan trọng để có được sức khỏe thể chất và tinh thần. Nó giúp điều chỉnh tâm trạng, cải thiện chức năng nhận thức và hỗ trợ tăng trưởng khỏe mạnh và chức năng miễn dịch. Đặt mục tiêu ngủ 7-9 giờ mỗi đêm.', 'output_en': '1. Eat a balanced and nutritious diet: Make sure your meals are inclusive of a variety of fruits and vegetables, lean protein, whole grains, and healthy fats. This helps to provide your body with the essential nutrients to function at its best and can help prevent chronic diseases.\n\n2. Engage in regular physical activity: Exercise is crucial for maintaining strong bones, muscles, and cardiovascular health. Aim for at least 150 minutes of moderate aerobic exercise or 75 minutes of vigorous exercise each week.\n\n3. Get enough sleep: Getting enough quality sleep is crucial for physical and mental well-being. It helps to regulate mood, improve cognitive function, and supports healthy growth and immune function. Aim for 7-9 hours of sleep each night.', 'instruction_en': 'Give three tips for staying healthy.'}
+
+
+--- Cell 17 ---
+SRC: # THÊM 2 DÒNG NÀY VÀO ĐÂY:
+from unsloth.chat_templates import get_chat_template
+tokenizer = get_chat
+OUT: Unsloth: Will map <|im_end|> to EOS = <|im_end|>.
+
+
+--- Cell 18 ---
+SRC: # Alpaca → ChatML format (Qwen2.5's native template)
+def format_alpaca_to_chat(row):
+    messages = 
+OUT: Map:   0%|          | 0/1000 [00:00<?, ? examples/s]
+
+
+Sample formatted text (first 500 chars):
+
+<|im_start|>user
+
+Đưa ra ba lời khuyên để giữ sức khỏe.<|im_end|>
+
+<|im_start|>assistant
+
+1. Ăn một chế độ ăn uống cân bằng và bổ dưỡng: Đảm bảo bữa ăn của bạn bao gồm nhiều loại trái cây và rau quả, protein nạc, ngũ cốc nguyên hạt và chất béo lành mạnh. Điều này giúp cung cấp cho cơ thể bạn các chất dinh dưỡng cần thiết để hoạt động tốt nhất và có thể giúp ngăn ngừa các bệnh mãn tính. 2. Tham gia hoạt động thể chất thường xuyên: Tập thể dục rất quan trọng để duy trì xương, cơ bắp và sức khỏe tim m
+
+
+--- Cell 20 ---
+SRC: from trl import SFTTrainer, SFTConfig
+
+sft_config = SFTConfig(
+    output_dir=str(ADAPTER_OUT.parent
+OUT: warmup_ratio is deprecated and will be removed in v5.2. Use `warmup_steps` instead.
+
+Unsloth: Tokenizing ["text"] (num_proc=6):   0%|          | 0/1000 [00:00<?, ? examples/s]
+🦥 Unsloth: Padding-free auto-enabled, enabling faster training.
+
+
+--- Cell 21 ---
+SRC: train_result = trainer.train()
+print(f"\nFinal train loss: {train_result.training_loss:.4f}")
+OUT: The tokenizer has new PAD/BOS/EOS tokens that differ from the model config and generation config. The model config and generation config were aligned accordingly, being updated with the tokenizer's values. Updated tokens: {'bos_token_id': None}.
+
+==((====))==  Unsloth - 2x faster free finetuning | Num GPUs used = 1
+
+   \\   /|    Num examples = 1,000 | Num Epochs = 1 | Total steps = 125
+
+O^O/ \_/ \    Batch size per device = 1 | Gradient accumulation steps = 8
+
+\        /    Data Parallel GPUs = 1 | Total batch size (1 x 8 x 1) = 8
+
+ "-____-"     Trainable parameters = 29,933,568 of 3,115,872,256 (0.96% trained)
+
+`use_return_dict` is deprecated! Use `return_dict` instead!
+
+<IPython.core.display.HTML object>
+
+
+Final train loss: 1.4932
+
+
+--- Cell 23 ---
+SRC: import matplotlib.pyplot as plt
+
+losses = [log["loss"] for log in trainer.state.log_history if "loss
+OUT: <Figure size 800x400 with 1 Axes>
+
+--- Cell 25 ---
+SRC: trainer.model.save_pretrained(str(ADAPTER_OUT))
+tokenizer.save_pretrained(str(ADAPTER_OUT))
+print(f"
+OUT: Unsloth: Restored added_tokens_decoder metadata in /content/lab22/adapters/sft-mini/tokenizer_config.json.
+
+Saved SFT adapter to /content/lab22/adapters/sft-mini
+
+
+--- Cell 26 ---
+SRC: # Sanity: generate 1 sample to confirm the adapter loaded correctly.
+FastLanguageModel.for_inference
+OUT: The attention mask is not set and cannot be inferred from input because pad token is same as eos token. As a consequence, you may observe unexpected behavior. Please pass your input's `attention_mask` to obtain reliable results.
+
+Both `max_new_tokens` (=200) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:71: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:281: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+
+PROMPT: Giải thích ngắn gọn (3-4 câu) thuật toán quicksort hoạt động thế nào.
+
+
+
+SFT-mini response:
+
+Quicksort là một thuật toán sắp xếp được phát triển bởi Tony Hoare vào năm 1960. Nó hoạt động dựa trên nguyên tắc phân đoạn và chia nhỏ. Thuật toán này chọn một phần tử trong mảng (được gọi là phần tử trung tâm) và phân chia mảng thành hai mảng con, một mảng con chứa các phần tử nhỏ hơn phần tử trung tâm và một mảng con chứa các phần tử lớn hơn phần tử trung tâm. Sau đó, thuật toán tiếp tục thực hiện quá trình tương tự với hai mảng con, chọn phần tử trung tâm cho mỗi mảng con và phân chia mảng con thành hai mảng con nhỏ hơn và lớn hơn phần tử trung tâm. Thuật toán tiếp tục phân chia và sắp xếp các mảng con nhỏ hơn và lớn hơn cho đến khi các mảng con chỉ còn một phần tử. Sau đó, các mảng con được nối
+
+
+--- Cell 31 ---
+SRC: import os
+from pathlib import Path
+
+COMPUTE_TIER = os.environ.get("COMPUTE_TIER", "T4").upper()
+
+if 
+OUT: COMPUTE_TIER:    T4
+
+PREF_DATASET:    argilla/ultrafeedback-binarized-preferences-cleaned  (slice: 2000)
+
+MAX_LEN:         512
+
+MAX_PROMPT_LEN:  256
+
+output:          /content/lab22/data/pref
+
+
+--- Cell 33 ---
+SRC: from transformers import AutoTokenizer
+
+assert ADAPTER_DIR.exists(), f"NB1 must run first — {ADAPTER
+OUT: Tokenizer: Qwen2Tokenizer  vocab=151,643
+
+
+--- Cell 35 ---
+SRC: from datasets import load_dataset
+
+ds = load_dataset(PREF_DATASET, split=f"train[:{PREF_SLICE}]")
+pr
+OUT: README.md: 0.00B [00:00, ?B/s]
+data/train-00000-of-00001.parquet:   0%|          | 0.00/143M [00:00<?, ?B/s]
+Generating train split:   0%|          | 0/60917 [00:00<?, ? examples/s]
+Loaded 2000 pairs. Columns: ['source', 'prompt', 'chosen', 'chosen-rating', 'chosen-model', 'rejected', 'rejected-rating', 'rejected-model']
+
+
+--- Cell 37 ---
+SRC: def format_pref(row):
+    prompt_msgs = [{"role": "user", "content": row["prompt"]}]
+    prompt_text
+OUT: Map:   0%|          | 0/2000 [00:00<?, ? examples/s]
+Formatted: 2000 pairs · cols: ['prompt', 'chosen', 'rejected']
+
+
+--- Cell 39 ---
+SRC: import textwrap
+
+for i in range(3):
+    row = pref[i]
+    n_prompt = len(tokenizer(row["prompt"]).in
+OUT: 
+
+────── Example 1 ──────
+
+PROMPT (112 tok):
+
+<|im_start|>user Can you write a C++ program that prompts the user to enter the name of a country and checks if it borders the Mediterranean Sea? Here's some starter code to help you out: [...]
+
+
+
+CHOSEN (488 tok):
+
+Here's a C++ program that prompts the user to enter the name of a country and checks if it borders the Mediterranean Sea: #include <iostream> #include <string> #include <set> #include <map> #include <algorithm> using namespace std; int main() { [...]
+
+
+
+REJECTED (217 tok):
+
+Sure, here is the program using the C++11 algorithm "cds::algorithm::GreaterEqual": #include <iostream> #include <string> #include <algorithm> #include <vector> #include <cctype> using namespace std; int main() { string country; cout << "Enter [...]
+
+
+
+────── Example 2 ──────
+
+PROMPT (78 tok):
+
+<|im_start|>user Suppose you are a content creator and want to generate compelling titles and descriptions for your YouTube videos automatically. You have decided to use GPT to solve this [...]
+
+
+
+CHOSEN (742 tok):
+
+To use GPT for generating compelling titles and descriptions for your YouTube videos automatically, you can follow these steps: 1. Choose a GPT model: First, you'll need to decide which GPT model to use. OpenAI's GPT-3 is the most advanced [...]
+
+
+
+REJECTED (413 tok):
+
+Sure, here is an example of how you can use GPT to generate titles and descriptions for your YouTube videos automatically: 1. First, you'll need to train the GPT model on a corpus of data that includes titles and descriptions of YouTube videos [...]
+
+
+--- Cell 41 ---
+SRC: import numpy as np
+
+prompt_lens = np.array([len(tokenizer(p).input_ids) for p in pref["prompt"]])
+ch
+OUT: Prompt:   median=87  P95=312
+
+Chosen:   median=400  P95=811
+
+Rejected: median=278  P95=792
+
+
+
+44.2% of pairs fit in MAX_LEN=512
+
+⚠  Less than 80% fit. Consider increasing MAX_LEN or filtering long pairs.
+
+
+--- Cell 43 ---
+SRC: pref.to_parquet(str(PREF_OUT / "train.parquet"))
+print(f"Saved {len(pref)} pairs to {PREF_OUT / 'tra
+OUT: Creating parquet from Arrow format:   0%|          | 0/1 [00:00<?, ?ba/s]
+Saved 2000 pairs to /content/lab22/data/pref/train.parquet
+
+Creating parquet from Arrow format:   0%|          | 0/1 [00:00<?, ?ba/s]
+Saved 50 eval pairs to /content/lab22/data/pref/eval.parquet
+
+
+--- Cell 48 ---
+SRC: import os
+from pathlib import Path
+
+COMPUTE_TIER = os.environ.get("COMPUTE_TIER", "T4").upper()
+
+if 
+OUT: COMPUTE_TIER:    T4
+
+BASE_MODEL:      unsloth/Qwen2.5-3B-bnb-4bit
+
+DPO hyperparams: beta=0.1  lr=5e-07  epochs=1
+
+max_length:      512  (prompt=256)
+
+effective batch: 8
+
+SFT input:       /content/lab22/adapters/sft-mini
+
+output:          /content/lab22/adapters/dpo
+
+
+--- Cell 51 ---
+SRC: from unsloth import FastLanguageModel
+from peft import PeftModel
+
+# Policy — gets new DPO LoRA adapt
+OUT: ==((====))==  Unsloth 2026.5.2: Fast Qwen2 patching. Transformers: 5.5.0.
+
+   \\   /|    Tesla T4. Num GPUs = 1. Max memory: 14.563 GB. Platform: Linux.
+
+O^O/ \_/ \    Torch: 2.10.0+cu128. CUDA: 7.5. CUDA Toolkit: 12.8. Triton: 3.6.0
+
+\        /    Bfloat16 = FALSE. FA [Xformers = 0.0.35. FA2 = False]
+
+ "-____-"     Free license: http://github.com/unslothai/unsloth
+
+Unsloth: Fast downloading is enabled - ignore downloading bars which are red colored!
+
+Loading weights:   0%|          | 0/434 [00:00<?, ?it/s]
+unsloth/Qwen2.5-3B-bnb-4bit does not have a padding token! Will use pad_token = <|PAD_TOKEN|>.
+
+Policy: PeftModelForCausalLM with SFT adapter loaded
+
+
+--- Cell 52 ---
+SRC: # Wrap policy with NEW LoRA adapter for DPO updates (don't merge SFT — keep stacked)
+# Unsloth re-ap
+OUT: Unsloth: Already have LoRA adapters! We shall skip this step.
+
+Trainable params (DPO LoRA): 29,933,568
+
+
+--- Cell 55 ---
+SRC: from trl import DPOConfig
+
+dpo_config = DPOConfig(
+    output_dir=str(DPO_OUT.parent / "dpo-checkpoi
+OUT: warmup_ratio is deprecated and will be removed in v5.2. Use `warmup_steps` instead.
+
+DPOConfig: beta=0.1  lr=5e-07  loss_type=sigmoid
+
+
+--- Cell 57 ---
+SRC: from datasets import Dataset
+
+pref_ds = Dataset.from_parquet(str(PREF_PATH))
+print(f"Loaded {len(pre
+OUT: Generating train split: 0 examples [00:00, ? examples/s]
+Loaded 2000 preference pairs from /content/lab22/data/pref/train.parquet
+
+Columns: ['prompt', 'chosen', 'rejected']
+
+
+--- Cell 59 ---
+SRC: from trl import DPOTrainer
+
+trainer = DPOTrainer(
+    model=model,
+    ref_model=None,              
+OUT: Extracting prompt in train dataset (num_proc=5):   0%|          | 0/2000 [00:00<?, ? examples/s]
+Applying chat template to train dataset (num_proc=5):   0%|          | 0/2000 [00:00<?, ? examples/s]
+Tokenizing train dataset (num_proc=5):   0%|          | 0/2000 [00:00<?, ? examples/s]
+
+--- Cell 60 ---
+SRC: train_result = trainer.train()
+print(f"\nFinal DPO loss: {train_result.training_loss:.4f}")
+OUT: The tokenizer has new PAD/BOS/EOS tokens that differ from the model config and generation config. The model config and generation config were aligned accordingly, being updated with the tokenizer's values. Updated tokens: {'bos_token_id': None}.
+
+==((====))==  Unsloth - 2x faster free finetuning | Num GPUs used = 1
+
+   \\   /|    Num examples = 2,000 | Num Epochs = 1 | Total steps = 250
+
+O^O/ \_/ \    Batch size per device = 1 | Gradient accumulation steps = 8
+
+\        /    Data Parallel GPUs = 1 | Total batch size (1 x 8 x 1) = 8
+
+ "-____-"     Trainable parameters = 29,933,568 of 3,115,872,256 (0.96% trained)
+
+Unsloth: Will smartly offload gradients to save VRAM!
+
+Unsloth: Double buffering enabled (parallel H2D + compute) for backward pass.
+
+<IPython.core.display.HTML object>
+
+
+Final DPO loss: 0.8052
+
+
+--- Cell 62 ---
+SRC: import matplotlib.pyplot as plt
+import pandas as pd
+
+logs = pd.DataFrame(trainer.state.log_history)
+
+OUT: <Figure size 1300x420 with 2 Axes>
+
+--- Cell 64 ---
+SRC: if chosen_col and rejected_col and len(logs) >= 5:
+    last_chosen = logs[chosen_col].iloc[-5:].mean
+OUT: END  chosen reward:    -0.393
+
+END  rejected reward:  -0.551
+
+END  reward gap:       +0.158
+
+
+
+✓ INTENDED: chosen reward UP and gap positive. Classic DPO success.
+
+
+--- Cell 66 ---
+SRC: trainer.model.save_pretrained(str(DPO_OUT))
+tokenizer.save_pretrained(str(DPO_OUT))
+print(f"Saved DP
+OUT: Unsloth: Restored added_tokens_decoder metadata in /content/lab22/adapters/dpo/tokenizer_config.json.
+
+Saved DPO adapter to /content/lab22/adapters/dpo
+
+Wrote metrics to /content/lab22/adapters/dpo/dpo_metrics.json
+
+
+--- Cell 71 ---
+SRC: import os
+import json
+from pathlib import Path
+
+COMPUTE_TIER = os.environ.get("COMPUTE_TIER", "T4").
+OUT: Saved 8 eval prompts to /content/lab22/data/eval/prompts.json
+
+
+--- Cell 76 ---
+SRC: print("Generating with SFT-only adapter...")
+sft_outputs = generate_with_adapter(SFT_PATH, EVAL_PROM
+OUT: Generating with SFT-only adapter...
+
+==((====))==  Unsloth 2026.5.2: Fast Qwen2 patching. Transformers: 5.3.0.
+
+   \\   /|    Tesla T4. Num GPUs = 1. Max memory: 14.563 GB. Platform: Linux.
+
+O^O/ \_/ \    Torch: 2.10.0+cu128. CUDA: 7.5. CUDA Toolkit: 12.8. Triton: 3.6.0
+
+\        /    Bfloat16 = FALSE. FA [Xformers = 0.0.35. FA2 = False]
+
+ "-____-"     Free license: http://github.com/unslothai/unsloth
+
+Unsloth: Fast downloading is enabled - ignore downloading bars which are red colored!
+
+Loading weights:   0%|          | 0/434 [00:00<?, ?it/s]
+unsloth/Qwen2.5-3B-bnb-4bit does not have a padding token! Will use pad_token = <|PAD_TOKEN|>.
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:71: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+
+/usr/local/lib/python3.12/dist-packages/transformers/modeling_attn_mask_utils.py:281: FutureWarning: The attention mask API under `transformers.modeling_attn_mask_utils` (`AttentionMaskConverter`) is deprecated and will be removed in Transformers v5.10. Please use the new API in `transformers.masking_utils`.
+
+  warnings.warn(DEPRECATION_MESSAGE, FutureWarning)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+
+--- Cell 78 ---
+SRC: print("Generating with SFT+DPO adapter...")
+dpo_outputs = generate_with_adapter(DPO_PATH, EVAL_PROMP
+OUT: Generating with SFT+DPO adapter...
+
+==((====))==  Unsloth 2026.5.2: Fast Qwen2 patching. Transformers: 5.5.0.
+
+   \\   /|    Tesla T4. Num GPUs = 1. Max memory: 14.563 GB. Platform: Linux.
+
+O^O/ \_/ \    Torch: 2.10.0+cu128. CUDA: 7.5. CUDA Toolkit: 12.8. Triton: 3.6.0
+
+\        /    Bfloat16 = FALSE. FA [Xformers = 0.0.35. FA2 = False]
+
+ "-____-"     Free license: http://github.com/unslothai/unsloth
+
+Unsloth: Fast downloading is enabled - ignore downloading bars which are red colored!
+
+Loading weights:   0%|          | 0/434 [00:00<?, ?it/s]
+unsloth/Qwen2.5-3B-bnb-4bit does not have a padding token! Will use pad_token = <|PAD_TOKEN|>.
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Done — 8 responses
+
+
+--- Cell 80 ---
+SRC: import pandas as pd
+import textwrap
+
+rows = []
+for p, sft_out, dpo_out in zip(EVAL_PROMPTS, sft_outp
+OUT: 
+
+====================================================================================================
+
+SIDE-BY-SIDE COMPARISON (8 prompts × 2 models)
+
+====================================================================================================
+
+
+
+[#1 · HELPFULNESS]  Giải thích ngắn gọn (5-7 câu) cách thuật toán [...]
+
+  SFT-only:  Thuật toán quicksort là một thuật toán sắp xếp được phát triển bởi Tony Hoare vào năm 1959. Thuật toán này hoạt động dựa trên nguyên tắc phân đoạn và chia nhỏ. Thuật toán này hoạt động như sau: [...]
+
+  SFT+DPO:   Thuật toán quicksort là một thuật toán sắp xếp được phát triển bởi Tony Hoare vào năm 1959. Thuật toán này hoạt động dựa trên nguyên tắc phân đoạn và chia nhỏ. Thuật toán này hoạt động như sau: [...]
+
+
+
+[#2 · HELPFULNESS]  Tôi có 5kg gạo và 12 quả trứng. Gợi ý 3 món có thể nấu [...]
+
+  SFT-only:  1. Mì ống với sốt cà chua: Mì ống được nấu chín với sốt cà chua, hành tây xào và sốt mayonnaise. 2. Mì ống với sốt cà chua: Mì ống được nấu chín với sốt cà chua, hành tây xào và sốt mayonnaise. [...]
+
+  SFT+DPO:   1. Mì ống với sốt cà chua: Mì ống được nấu chín với sốt cà chua, hành tây xào và sốt mayonnaise. 2. Mì ống với sốt cà chua: Mì ống được nấu chín với sốt cà chua, hành tây xào và sốt mayonnaise. [...]
+
+
+
+[#3 · HELPFULNESS]  Hãy viết 1 email xin nghỉ phép 3 ngày để chăm con ốm. [...]
+
+  SFT-only:  [Địa chỉ email của bạn] [Ngày tháng năm] [Tên của bạn] [Địa chỉ của bạn] [Thành phố, tiểu bang] [Mã bưu điện] [Tên của bạn] [Địa chỉ của bạn] [Thành phố, tiểu bang] [Mã bưu điện] [Tên của bạn] [...]
+
+  SFT+DPO:   [Địa chỉ email của bạn] [Ngày tháng năm] [Tên của bạn] [Địa chỉ của bạn] [Thành phố, tiểu bang] [Mã bưu điện] [Tên của bạn] [Địa chỉ của bạn] [Thành phố, tiểu bang] [Mã bưu điện] [Tên của bạn] [...]
+
+
+
+[#4 · HELPFULNESS]  So sánh ưu nhược điểm của Python và JavaScript cho [...]
+
+  SFT-only:  1. Mã nguồn mở: Python và JavaScript đều là ngôn ngữ mã nguồn mở, có nghĩa là chúng có thể được sử dụng và chỉnh sửa miễn phí. Tuy nhiên, Python có nguồn gốc từ ngôn ngữ lập trình Lisp và được [...]
+
+  SFT+DPO:   1. Mã nguồn mở: Python và JavaScript đều là ngôn ngữ mã nguồn mở, có nghĩa là chúng có thể được sử dụng và chỉnh sửa miễn phí. Tuy nhiên, Python có nguồn gốc từ ngôn ngữ lập trình Lisp và được [...]
+
+
+--- Cell 82 ---
+SRC: import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(14, 0.7 * len(rows) + 1.5))
+ax.axis
+OUT: <Figure size 1400x710 with 1 Axes>
+
+--- Cell 85 ---
+SRC: judge_results = None
+
+if os.environ.get("OPENAI_API_KEY"):
+    print("Found OPENAI_API_KEY — running
+OUT: Found OPENAI_API_KEY — running gpt-4o-mini judge
+
+2556
+
+--- Cell 87 ---
+SRC: from collections import Counter
+
+# A = SFT-only, B = SFT+DPO
+counter_all = Counter(r["winner"] for r
+OUT: 
+
+============================================================
+
+WIN/LOSS/TIE SUMMARY (8 prompts)
+
+============================================================
+
+Overall:        SFT-only: 1/8   SFT+DPO: 3/8   tie: 4/8
+
+Helpfulness:    SFT-only: 1/4   SFT+DPO: 0/4   tie: 3/4
+
+Safety:         SFT-only: 0/4   SFT+DPO: 3/4   tie: 1/4
+
+
+--- Cell 92 ---
+SRC: import os
+import json
+from pathlib import Path
+
+COMPUTE_TIER = os.environ.get("COMPUTE_TIER", "T4").
+OUT: COMPUTE_TIER:    T4
+
+DPO adapter:     /content/lab22/adapters/dpo
+
+merged output:   /content/lab22/adapters/merged-fp16
+
+GGUF output:     /content/lab22/gguf
+
+
+--- Cell 95 ---
+SRC: from unsloth import FastLanguageModel
+from peft import PeftModel
+
+model, tokenizer = FastLanguageMod
+OUT: ==((====))==  Unsloth 2026.5.2: Fast Qwen2 patching. Transformers: 5.3.0.
+
+   \\   /|    Tesla T4. Num GPUs = 1. Max memory: 14.563 GB. Platform: Linux.
+
+O^O/ \_/ \    Torch: 2.10.0+cu128. CUDA: 7.5. CUDA Toolkit: 12.8. Triton: 3.6.0
+
+\        /    Bfloat16 = FALSE. FA [Xformers = 0.0.35. FA2 = False]
+
+ "-____-"     Free license: http://github.com/unslothai/unsloth
+
+Unsloth: Fast downloading is enabled - ignore downloading bars which are red colored!
+
+Loading weights:   0%|          | 0/434 [00:00<?, ?it/s]
+unsloth/Qwen2.5-3B-bnb-4bit does not have a padding token! Will use pad_token = <|PAD_TOKEN|>.
+
+Unsloth 2026.5.2 patched 36 layers with 36 QKV layers, 36 O layers and 36 MLP layers.
+
+Loaded SFT-mini adapter from /content/lab22/adapters/sft-mini
+
+
+--- Cell 98 ---
+SRC: !pip install transformers==5.3.0
+
+OUT: Collecting transformers==5.3.0
+
+  Downloading transformers-5.3.0-py3-none-any.whl.metadata (32 kB)
+
+Requirement already satisfied: huggingface-hub<2.0,>=1.3.0 in /usr/local/lib/python3.12/dist-packages (from transformers==5.3.0) (1.11.0)
+
+Requirement already satisfied: numpy>=1.17 in /usr/local/lib/python3.12/dist-packages (from transformers==5.3.0) (2.0.2)
+
+Requirement already satisfied: packaging>=20.0 in /usr/local/lib/python3.12/dist-packages (from transformers==5.3.0) (26.1)
+
+Requirement already satisfied: pyyaml>=5.1 in /usr/local/lib/python3.12/dist-packages (from transformers==5.3.0) (6.0.3)
+
+Requirement already satisfied: regex!=2019.12.17 in /usr/local/lib/python3.12/dist-packages (from transformers==5.3.0) (2025.11.3)
+
+Requirement already satisfied: tokenizers<=0.23.0,>=0.22.0 in /usr/local/lib/python3.12/dist-packages (from transformers==5.3.0) (0.22.2)
+
+Requirement already satisfied: typer in /usr/local/lib/python3.12/dist-packages (from transformers==5.3.0) (0.24.2)
+
+Requirement already satisfied: safetensors>=0.4.3 in /usr/local/lib/python3.12/dist-packages (from transformers==5.3.0) (0.7.0)
+
+Requirement already satisfied: tqdm>=4.27 in /usr/local/lib/python3.12/dist-packages (from transformers==5.3.0) (4.67.3)
+
+Requirement already satisfied: filelock>=3.10.0 in /usr/local/lib/python3.12/dist-packages (from huggingface-hub<2.0,>=1.3.0->transformers==5.3.0) (3.29.0)
+
+Requirement already satisfied: fsspec>=2023.5.0 in /usr/local/lib/python3.12/dist-packages (from huggingface-hub<2.0,>=1.3.0->transformers==5.3.0) (2025.3.0)
+
+Requirement already satisfied: hf-xet<2.0.0,>=1.4.3 in /usr/local/lib/python3.12/dist-packages (from huggingface-hub<2.0,>=1.3.0->transformers==5.3.0) (1.4.3)
+
+Requirement already satisfied: httpx<1,>=0.23.0 in /usr/local/lib/python3.12/dist-packages (from huggingface-hub<2.0,>=1.3.0->transformers==5.3.0) (0.28.1)
+
+Requirement already satisfied: typing-extensions>=4.1.0 in /usr/local/lib/python3.12/dist-packages (from huggingface-hub<2.0,>=1.3.0->transformers==5.3.0) (4.15.0)
+
+Requirement already satisfied: click>=8.2.1 in /usr/local/lib/python3.12/dist-packages (from typer->transformers==5.3.0) (8.3.3)
+
+Requirement already satisfied: shellingham>=1.3.0 in /usr/local/lib/python3.12/dist-packages (from typer->transformers==5.3.0) (1.5.4)
+
+Requirement already satisfied: rich>=12.3.0 in /usr/local/lib/python3.12/dist-packages (from typer->transformers==5.3.0) (13.9.4)
+
+Requirement already satisfied: annotated-doc>=0.0.2 in /usr/local/lib/python3.12/dist-packages (from typer->transformers==5.3.0) (0.0.4)
+
+
+--- Cell 99 ---
+SRC: import transformers
+print(transformers.__version__)
+
+OUT: 5.3.0
+
+
+--- Cell 100 ---
+SRC: # This re-loads the model with both SFT and DPO adapters merged into base weights.
+# Output is FP16 
+OUT: config.json:   0%|          | 0.00/775 [00:00<?, ?B/s]
+Unsloth: Restored added_tokens_decoder metadata in /content/lab22/adapters/merged-fp16/tokenizer_config.json.
+
+Found HuggingFace hub cache directory: /root/.cache/huggingface/hub
+
+Downloading (incomplete total...): 0.00B [00:00, ?B/s]
+Fetching 1 files:   0%|          | 0/1 [00:00<?, ?it/s]
+Checking cache directory for required files...
+
+Cache check failed: model-00001-of-00002.safetensors not found in local cache.
+
+Not all required files found in cache. Will proceed with downloading.
+
+Checking cache directory for required files...
+
+Cache check failed: tokenizer.model not found in local cache.
+
+Not all required files found in cache. Will proceed with downloading.
+
+
+
+Unsloth: Preparing safetensor model files:   0%|          | 0/2 [00:00<?, ?it/s][A
+model-00001-of-00002.safetensors:   0%|          | 0.00/4.96G [00:00<?, ?B/s]
+
+
+Unsloth: Preparing safetensor model files:  50%|█████     | 1/2 [02:37<02:37, 157.37s/it][A
+model-00002-of-00002.safetensors:   0%|          | 0.00/1.21G [00:00<?, ?B/s]
+
+
+Unsloth: Preparing safetensor model files: 100%|██████████| 2/2 [02:57<00:00, 88.91s/it]
+
+Note: tokenizer.model not found (this is OK for non-SentencePiece models)
+
+
+--- Cell 102 ---
+SRC: # Reload the merged model — Unsloth's GGUF saver expects a live model handle.
+from unsloth import Fa
+OUT: ==((====))==  Unsloth 2026.5.2: Fast Qwen2 patching. Transformers: 5.3.0.
+
+   \\   /|    Tesla T4. Num GPUs = 1. Max memory: 14.563 GB. Platform: Linux.
+
+O^O/ \_/ \    Torch: 2.10.0+cu128. CUDA: 7.5. CUDA Toolkit: 12.8. Triton: 3.6.0
+
+\        /    Bfloat16 = FALSE. FA [Xformers = 0.0.35. FA2 = False]
+
+ "-____-"     Free license: http://github.com/unslothai/unsloth
+
+Unsloth: Fast downloading is enabled - ignore downloading bars which are red colored!
+
+Loading weights:   0%|          | 0/434 [00:00<?, ?it/s]
+The tokenizer you are loading from '/content/lab22/adapters/merged-fp16' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.
+
+The tokenizer you are loading from '/content/lab22/adapters/merged-fp16' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.
+
+
+--- Cell 103 ---
+SRC: # Save GGUF in 1 quantization tier (Q4_K_M). Add more tiers below if you want the
+# +3 "GGUF release
+OUT: Unsloth: Model is not a PEFT model. Using existing checkpoint at /content/lab22/adapters/merged-fp16
+
+Unsloth: Converting to GGUF format...
+
+==((====))==  Unsloth: Conversion from HF to GGUF information
+
+   \\   /|    [0] Installing llama.cpp might take 3 minutes.
+
+O^O/ \_/ \    [1] Converting HF to GGUF f16 might take 3 minutes.
+
+\        /    [2] Converting GGUF f16 to ['q4_k_m'] might take 10 minutes each.
+
+ "-____-"     In total, you will have to wait at least 16 minutes.
+
+
+
+Unsloth: Installing llama.cpp. This might take 3 minutes...
+
+Unsloth: Updating system package directories
+
+Unsloth: Cloning llama.cpp repository...
+
+Unsloth: Building llama.cpp - please wait 1 to 3 minutes
+
+Unsloth: Successfully installed llama.cpp!
+
+Unsloth: Preparing converter script...
+
+WARNING:unsloth_zoo.llama_cpp:Unsloth: Qwen2MoE num_experts patch target not found.
+
+Unsloth: [1] Converting model into f16 GGUF format.
+
+This might take 3 minutes...
+
+Unsloth: Initial conversion completed! Files: ['/content/lab22/adapters/merged-fp16_gguf/merged-fp16.F16.gguf']
+
+Unsloth: [2] Converting GGUF f16 into q4_k_m. This might take 10 minutes...
+
+Unsloth: Model files cleanup...
+
+
+--- Cell 104 ---
+SRC: import shutil
+src = "/content/lab22/adapters/merged-fp16_gguf/merged-fp16.Q4_K_M.gguf"
+dst = GGUF_DI
+OUT: Copied to /content/lab22/gguf/merged-fp16.Q4_K_M.gguf (1929.9 MB)
+
+
+--- Cell 107 ---
+SRC: import os
+
+print("GGUF files:")
+for p in sorted(GGUF_DIR.iterdir()):
+    if p.suffix == ".gguf":
+   
+OUT: GGUF files:
+
+
+--- Cell 109 ---
+SRC: import os
+print("Tất cả file trong GGUF_DIR:")
+for p in sorted(GGUF_DIR.iterdir()):
+    size_mb = p.
+OUT: Tất cả file trong GGUF_DIR:
+
+  config.json                                              0.0 MB
+
+  generation_config.json                                   0.0 MB
+
+  merged-fp16.Q4_K_M.gguf                               1929.9 MB
+
+
+--- Cell 110 ---
+SRC: from llama_cpp import Llama
+
+# Find the Q4_K_M GGUF
+gguf_files = list(GGUF_DIR.glob("*Q4_K_M*.gguf")
+OUT: Loading: merged-fp16.Q4_K_M.gguf
+
+llama_context: n_ctx_seq (512) < n_ctx_train (32768) -- the full capacity of the model will not be utilized
+
+Loaded.
+
+
+--- Cell 112 ---
+SRC: SMOKE_PROMPT = "Giải thích ngắn gọn (3 câu) cách thuật toán Bubble sort hoạt động."
+
+response = llm.
+OUT: PROMPT:
+
+  Giải thích ngắn gọn (3 câu) cách thuật toán Bubble sort hoạt động.
+
+
+
+RESPONSE (Q4_K_M GGUF, llama-cpp-python):
+
+  Bubble sort là một thuật toán sắp xếp phổ biến được sử dụng để sắp xếp một danh sách. Nó hoạt động bằng cách lặp lại quá trình so sánh và giao dịch các phần tử trong danh sách cho đến khi danh sách được sắp xếp. Đầu tiên, nó so sánh hai phần tử liên tiếp trong danh sách và nếu chúng không ở đúng thứ tự, nó giao dịch chúng. Sau đó, nó so sánh hai phần tử tiếp theo và tiếp tục quá trình này cho đến khi danh sách được sắp xếp. Sau mỗi vòng lặp, danh sách được sắp xếp tốt hơn một chút.
+
+
+
+Tokens used: {'prompt_tokens': 26, 'completion_tokens': 126, 'total_tokens': 152}
+
+
+--- Cell 115 ---
+SRC: deploy_meta = {
+    "compute_tier": COMPUTE_TIER,
+    "base_model": BASE_MODEL,
+    "merged_path": s
+OUT: Saved data/eval/deploy_meta.json
+
+
+--- Cell 120 ---
+SRC: import os
+import json
+import gc
+from pathlib import Path
+
+COMPUTE_TIER = os.environ.get("COMPUTE_TIE
+OUT: COMPUTE_TIER:    T4
+
+IFEval:          50 prompts
+
+GSM8K:           50 problems
+
+MMLU:            50 questions
+
+AlpacaEval-lite: 100 prompts
+
+output:          /content/lab22/data/eval
+
+
+--- Cell 125 ---
+SRC: print(">>> SFT-only on IFEval")
+sft_ifeval = run_lm_eval(SFT_PATH, "ifeval", LIMIT_IFEVAL, num_fewsh
+OUT: >>> SFT-only on IFEval
+
+
+
+============================================================
+
+Running lm-eval [sft]: ifeval
+
+============================================================
+
+>>> SFT+DPO on IFEval
+
+
+
+============================================================
+
+Running lm-eval [dpo]: ifeval
+
+============================================================
+
+
+--- Cell 127 ---
+SRC: print(">>> SFT-only on GSM8K")
+sft_gsm8k = run_lm_eval(SFT_PATH, "gsm8k", LIMIT_GSM8K, num_fewshot=8
+OUT: >>> SFT-only on GSM8K
+
+
+
+============================================================
+
+Running lm-eval [sft]: gsm8k
+
+============================================================
+
+>>> SFT+DPO on GSM8K
+
+
+
+============================================================
+
+Running lm-eval [dpo]: gsm8k
+
+============================================================
+
+
+--- Cell 129 ---
+SRC: print(">>> SFT-only on MMLU (sampled)")
+sft_mmlu = run_lm_eval(SFT_PATH, "mmlu", LIMIT_MMLU, num_few
+OUT: >>> SFT-only on MMLU (sampled)
+
+
+
+============================================================
+
+Running lm-eval [sft]: mmlu
+
+============================================================
+
+
+--- Cell 131 ---
+SRC: from datasets import load_dataset
+
+
+def load_alpaca_lite_prompts(n):
+    """Load first n prompts fro
+OUT: `trust_remote_code` is not supported anymore.
+
+Please check that the Hugging Face dataset 'tatsu-lab/alpaca_eval' isn't based on a loading script and remove `trust_remote_code`.
+
+If the dataset is based on a loading script, please ask the dataset author to remove it and convert it to a standard format like Parquet.
+
+ERROR:datasets.load:`trust_remote_code` is not supported anymore.
+
+Please check that the Hugging Face dataset 'tatsu-lab/alpaca_eval' isn't based on a loading script and remove `trust_remote_code`.
+
+If the dataset is based on a loading script, please ask the dataset author to remove it and convert it to a standard format like Parquet.
+
+README.md:   0%|          | 0.00/30.0 [00:00<?, ?B/s]
+alpaca_eval.py: 0.00B [00:00, ?B/s]
+alpaca_eval dataset load failed (Dataset scripts are no longer supported, but found alpaca_eval.py); using NB4 fallback
+
+Loaded 100 AlpacaEval-lite prompts
+
+
+--- Cell 134 ---
+SRC: from google.colab import userdata
+import os
+
+# Đọc từ Secrets (tên key phải ĐÚNG như bạn đã nhập tro
+OUT: ❌ HF_TOKEN not found in Secrets
+
+✅ OPENAI_API_KEY loaded
+
+
+--- Cell 135 ---
+SRC: import random
+
+if alpaca_prompts and (os.environ.get("OPENAI_API_KEY") or os.environ.get("ANTHROPIC_
+OUT: >>> Generating SFT-only on 100 AlpacaEval-lite prompts
+
+==((====))==  Unsloth 2026.5.2: Fast Qwen2 patching. Transformers: 5.3.0.
+
+   \\   /|    Tesla T4. Num GPUs = 1. Max memory: 14.563 GB. Platform: Linux.
+
+O^O/ \_/ \    Torch: 2.10.0+cu128. CUDA: 7.5. CUDA Toolkit: 12.8. Triton: 3.6.0
+
+\        /    Bfloat16 = FALSE. FA [Xformers = 0.0.35. FA2 = False]
+
+ "-____-"     Free license: http://github.com/unslothai/unsloth
+
+Unsloth: Fast downloading is enabled - ignore downloading bars which are red colored!
+
+HTTP Error 500 thrown while requesting GET https://huggingface.co/api/models/unslothai/repeat/xet-read-token/7c48478c02f84ed89f149b0815cc0216ee831fb0
+
+WARNING:huggingface_hub.utils._http:HTTP Error 500 thrown while requesting GET https://huggingface.co/api/models/unslothai/repeat/xet-read-token/7c48478c02f84ed89f149b0815cc0216ee831fb0
+
+Retrying in 1s [Retry 1/5].
+
+WARNING:huggingface_hub.utils._http:Retrying in 1s [Retry 1/5].
+
+Loading weights:   0%|          | 0/434 [00:00<?, ?it/s]
+unsloth/Qwen2.5-3B-bnb-4bit does not have a padding token! Will use pad_token = <|PAD_TOKEN|>.
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+Both `max_new_tokens` (=256) and `max_length`(=32768) seem to have been set. `max_new_tokens` will take precedence. Please refer to the documentation for more information. (https://huggingface.co/docs/transformers/main/en/main_classes/text_generation)
+
+
+--- Cell 137 ---
+SRC: def extract_score(results, primary_metric):
+    """Pull the primary metric from a lm-eval results di
+OUT: 
+
+============================================================
+
+BENCHMARK RESULTS
+
+============================================================
+
+  IFEval              SFT: 0.060   DPO: 0.060   Δ: +0.000 —
+
+  GSM8K               SFT: 0.540   DPO: 0.600   Δ: +0.060 ↑
+
+  MMLU                SFT: nan   DPO: nan   Δ: +nan —
+
+  AlpacaEval-lite     SFT: 0.500   DPO: 0.620   Δ: +0.120 ↑
+
+
+--- Cell 138 ---
+SRC: import matplotlib.pyplot as plt
+import numpy as np
+
+bench_names = list(metrics.keys())
+sft_scores = 
+OUT: <Figure size 1100x500 with 1 Axes>
+
+--- Cell 140 ---
+SRC: final = {
+    "compute_tier": COMPUTE_TIER,
+    "limits": {
+        "ifeval": LIMIT_IFEVAL,
+        
+OUT: 
+
+Saved /content/lab22/data/eval/benchmark_results.json
